@@ -942,3 +942,141 @@ def main():
 if __name__ == "__main__":
     main()
 ```
+
+## Question14
+
+```python
+import json
+
+questions_path = "da-dev-questions.jsonl"
+labels_path = "da-dev-labels.jsonl"
+
+questions = []
+with open(questions_path, 'r') as f:
+    for line in f:
+        questions.append(json.loads(line))
+
+labels = []
+with open(labels_path, 'r') as f:
+    for line in f:
+        labels.append(json.loads(line))
+
+print(f"Number of questions: {len(questions)}")
+print(f"Number of labels: {len(labels)}")
+print(f"Are counts equal? {len(questions) == len(labels)}")
+
+print("\n--- Example Question Record ---")
+print("Keys:", list(questions[0].keys()))
+print(json.dumps(questions[0], indent=2))
+
+print("\n--- Example Label Record ---")
+print("Keys:", list(labels[0].keys()))
+print(json.dumps(labels[0], indent=2))
+```
+
+## Question 15
+```python
+import json
+import pandas as pd
+import random
+
+random.seed(42)
+
+questions = []
+with open("da-dev-questions.jsonl", "r") as f:
+    for line in f:
+        questions.append(json.loads(line))
+
+selected_ids = random.sample(range(len(questions)), 3)
+print("Selected question IDs:", selected_ids)
+
+for qid in selected_ids:
+    record = questions[qid]
+    file_name = record["file_name"]
+    question = record["question"]
+    
+    print(f"\n--- Question ID: {qid} ---")
+    print(f"CSV file: {file_name}")
+    print(f"Question: {question}")
+    
+    df = pd.read_csv(f"da-dev-tables/{file_name}")
+    print(f"Shape: {df.shape}")
+    print("Data types:")
+    print(df.dtypes)
+    print("First 3 rows:")
+    print(df.head(3).to_string(index=False))
+```
+
+## Question 17
+```python
+import json
+
+selected_ids = [0, 5, 9, 10, 14, 18, 24, 25, 26, 55]
+questions = []
+
+with open("da-dev-questions.jsonl", "r") as f:
+    for line in f:
+        q = json.loads(line)
+        if q["id"] in selected_ids:
+            questions.append(q)
+
+questions.sort(key=lambda x: selected_ids.index(x["id"]))
+
+for q in questions:
+    print(f"ID: {q['id']}")
+    print(f"Question: {q['question']}")
+    print(f"File: {q['file_name']}")
+    print(f"Format: {q['format']}")
+    print(f"Constraints: {q.get('constraints', 'None')}")
+    print("-" * 50)
+```
+
+## Question 18
+```python
+import torch
+import outlines
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from pydantic import BaseModel
+
+class PlannerOutput(BaseModel):
+    thought: str
+    is_done: bool
+    response: str
+
+MODEL_NAME = "Qwen/Qwen3-4B-Instruct-2507"
+print(f"Loading model {MODEL_NAME} ...")
+
+hf_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+hf_model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME,
+    device_map="auto",
+    torch_dtype=torch.float16
+)
+
+model = outlines.from_transformers(hf_model, hf_tokenizer)
+print(f"Model loaded on device: {hf_model.device}\n")
+
+def generate_structured(prompt_text: str) -> PlannerOutput:
+    result_json = model(prompt_text, PlannerOutput, max_new_tokens=1024)
+    return PlannerOutput.model_validate_json(result_json)
+
+prompts = [
+    "We need to compute the average fare from the titanic dataset. What should we do first?",
+    "The user asks: 'What is the correlation between age and fare?'. Plan the next step.",
+    "All required statistics have been computed and the final answer is ready: @mean_fare[34.67]",
+    "We attempted to load the CSV but got a FileNotFoundError. How should we handle this?",
+    "The task is to find the maximum value in the 'Sales' column. Outline the approach."
+]
+
+print("Generating structured outputs (5 prompts)...\n")
+for i, prompt in enumerate(prompts, 1):
+    output = generate_structured(prompt)
+    print(f"Prompt {i}: {prompt}")
+    print(f"  thought : {output.thought}")
+    print(f"  is_done : {output.is_done}")
+    print(f"  response: {output.response}\n")
+
+print("All generations succeeded and parsed into PlannerOutput objects.")
+```
+
+## Question 1
